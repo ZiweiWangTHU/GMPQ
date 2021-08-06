@@ -1,7 +1,6 @@
 ## GMPQ: Generalizable Mixed-Precision Quantization via Attribution Rank Preservation
 
-This is the pytorch implementation for the paper: *Generalizable Mixed-Precision Quantization via Attribution Rank Preservation*, 
-which is accepted to ICCV2021. This repo contains searching the quantization policy via attribution preservation on small datasets 
+This is the pytorch implementation for the paper: *Generalizable Mixed-Precision Quantization via Attribution Rank Preservation*, which is accepted to ICCV2021. This repo contains searching the quantization policy via attribution preservation on small datasets 
 including CIFAR-10, Cars, Flowers, Aircraft, Pets and Food, and finetuning on largescale dataset like ImageNet using our proposed GMPQ.
 
 
@@ -39,21 +38,31 @@ For a specific small dataset, you should first pretrain a full-precision model t
 After that, you can start searching the quantization policy. Take ResNet18 and CIFAR-10 for example:
 
 ```
-python search_attention.py \
--a mixres18_w234a234  -fa full_resnet18  --epochs 25  --pretrained pretrain_model.pth.tar --aw 40 \
+CUDA_VISIBLE_DEVICES=0,1 python search_attention.py \
+-a mixres18_w2346a2346  -fa qresnet18_cifar  --epochs 25  --pretrained pretrain_model.pth.tar --aw 40 \
 --dataname cifar10 --expname cifar10_resnet18  --cd 0.0003   --step-epoch 10    \
 --batch-size 256   --lr 0.1   --lra 0.01 -j 16  \
- path/to/cifar10 \
+  path/to/cifar10 \
 ```
- It also supports the other network architectures like ResNet50 and other small datasets like Cars, Flowers, Aircraft, Pets and Food.
+ It also supports other network architectures like ResNet50 and other small datasets like Cars, Flowers, Aircraft, Pets and Food.
  
  ### Finetuning on ImageNet
 
 After searching, you can get the optimal quantization policy, with the checkpoint `arch_checkpoint.pth.tar`. You can run the following command to finetune and evaluate the performance on ImageNet dataset. 
 
 ```
-python main.py \
-  -a quantres18_cfg --epochs 100 --step-epoch 30 -j 16 \
-  --ac arch_checkpoint.pth.tar \
-  /path/to/imagenet \
+
+CUDA_VISIBLE_DEVICES=0,1 python main.py     \
+ -a qresnet18                 \
+ --ac arch_checkpoint.pth.tar \
+ -c checkpoints/train_resnet18   \
+ --data_name imagenet          \
+ --data path/to/imagenet           \
+ --epochs 100                     \
+ --pretrained pretrained.pth.tar
+ --lr 0.01                    \
+ --gpu_id 1,2,3     \
+ --train_batch_per_gpu 192              \
+ --wd 4e-5                       \
+ --workers 32                    \
 ```

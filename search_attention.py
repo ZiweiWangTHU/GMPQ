@@ -534,19 +534,22 @@ def train(train_loader, model,full_model, criterion, optimizer, arch_optimizer, 
         target = target.cuda(args.gpu, non_blocking=True)
 
         aux_loss=0
-        output,attr_quant,sum_bitw,sum_bita = model(images,mode='swa',TS='Quant')
+        output,attr_quant = model(images,mode='swa',TS='Quant')
         output_full,attr_full = full_model(images,mode='swa',TS='Full')
 
-        if args.pnorm:
+        if args.pnorm>0:
             pnorm=args.pnorm
         else:
-            pnorm=args.product/(sum_bitw * sum_bita)
+            if hasattr(model, 'module'):
+                mix_bops = model.module.fetch_bit()
+            else:
+                mix_bops = model.fetch_bit()
+            pnorm=args.product*mix_bops
+
 
         loss = criterion(output, target)
 
         for l in range(len(attr_full)):
-
-
 
             attr_full[l] = torch.pow(attr_full[l], pnorm)
             aux_loss += cal_l2loss(attr_full[l], attr_quant[l])
