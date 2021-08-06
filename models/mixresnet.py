@@ -7,7 +7,7 @@ from torch import Tensor
 import torch
 
 __all__ = [
-    'mixres18_w1234a234', 'mixres50_w1234a234','mixres18_w234a234'
+    'mixres18_w2346a2346', 'mixres50_w234a234','mixres18_w234a234'
 ]
 
 
@@ -102,10 +102,9 @@ class ResNet(nn.Module):
         self.conv_func = conv_func
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        # self.relu = nn.ReLU(inplace=True)
+
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
-        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(
             block, conv_func, 64, layers[0], bnaff=bnaff, **kwargs)
         self.layer2 = self._make_layer(
@@ -147,7 +146,6 @@ class ResNet(nn.Module):
 
     def forward(self, x,mode=None,TS=None, grad_out=None):
         x = self.conv1(x)
-        # x = self.maxpool(x)
         x = self.bn1(x)
         x = self.relu(x)
 
@@ -157,15 +155,14 @@ class ResNet(nn.Module):
         f0 = self.layer4(x)
 
 
-
         if mode == "eval":
             pass
         elif mode == 'swa':
             f0.retain_grad()
 
-
         out = F.avg_pool2d(f0, 4)
         out = out.view(out.size(0), -1)
+        out = self.fc(out)
 
         if mode == 'swa':
             if not isinstance(grad_out, Variable):
@@ -174,20 +171,12 @@ class ResNet(nn.Module):
 
             swa = self.cal_grad(out, grad_out, TS, [f0])
 
-            sum_bita, sum_bitw = 0, 0
+            return out, swa
 
-            for m in self.layer4.modules():
-                if isinstance(m, self.conv_func):
-                    mixbitw, mixbita = m.fetch_bit()
 
-                    sum_bita += mixbita
-                    sum_bitw += mixbitw
-
-            return out, swa,  sum_bitw, sum_bita
-
-        out = self.fc(out)
 
         return out
+
 
 
     def cal_grad(self, out, grad_out, TS, feature):
@@ -210,7 +199,6 @@ class ResNet(nn.Module):
             channel = linear * feature[0]
             swa = torch.sum(channel, 1, keepdim=True)
             attributions.append(F.relu(swa))
-
 
         return attributions
 
@@ -250,15 +238,26 @@ class ResNet(nn.Module):
                 layer_idx += 1
         return best_arch, sum_bitops, sum_bita, sum_bitw, sum_mixbitops, sum_mixbita, sum_mixbitw
 
+    def fetch_bit(self):
+        sum_mix_bit=0.
+        layer_idx = 0
+        for m in self.modules():
+            if isinstance(m, self.conv_func):
+                mixbitw, mixbita = m.fetch_mix_bit(layer_idx)
+                sum_mix_bit += 1./mixbitw * 1./mixbita
+                layer_idx += 1
 
-def mixres18_w1234a234(**kwargs):
-    return ResNet(BasicBlock, qm.MixActivConv2d, [2, 2, 2, 2], wbits=[1, 2, 3, 4], abits=[2, 3, 4],
-                  share_weight=True, **kwargs)
+        return sum_mix_bit/layer_idx
+
+
+
 def mixres18_w234a234(**kwargs):
     return ResNet(BasicBlock, qm.MixActivConv2d, [2, 2, 2, 2], wbits=[ 2, 3, 4], abits=[2, 3, 4],
                   share_weight=True, **kwargs)
+def mixres18_w2346a2346(**kwargs):
+    return ResNet(BasicBlock, qm.MixActivConv2d, [2, 2, 2, 2], wbits=[ 2, 3, 4, 6], abits=[2, 3, 4, 6],
+                  share_weight=True, **kwargs)
 
-
-def mixres50_w1234a234(**kwargs):
-    return ResNet(Bottleneck, qm.MixActivConv2d, [3, 4, 6, 3], wbits=[1, 2, 3, 4], abits=[2, 3, 4],
+def mixres50_w234a234(**kwargs):
+    return ResNet(Bottleneck, qm.MixActivConv2d, [3, 4, 6, 3], wbits=[2, 3, 4], abits=[2, 3, 4],
                   share_weight=True, **kwargs)

@@ -6,6 +6,7 @@ from torchvision.datasets.utils import download_url
 from torchvision.datasets.utils import extract_archive
 
 
+
 class Aircraft(VisionDataset):
     """`FGVC-Aircraft <http://www.robots.ox.ac.uk/~vgg/data/fgvc-aircraft/>`_ Dataset.
     Args:
